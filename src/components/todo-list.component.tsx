@@ -1,6 +1,6 @@
 // src/components/TodoList.tsx
 
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 
 import { Todo } from '../types/todo-type';
 
@@ -28,15 +28,26 @@ interface FetchTodosParams {
  */
 // remove eslint-disable-next-line @typescript-eslint/no-unused-vars when you use the parameters in the function
 export const fetchTodos = async ({
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   setTodos,
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   setFilteredTodos,
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   setLoading,
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   setError,
-}: FetchTodosParams): Promise<void> => {};
+}: FetchTodosParams): Promise<void> => {
+  setLoading(true);
+  try {
+    const response = await fetch('https://jsonplaceholder.typicode.com/todos');
+    if (!response.ok) {
+      throw new Error(`HTTP error! Status: ${response.status}`);
+    }
+    const data: Todo[] = await response.json();
+    setTodos(data);
+    setFilteredTodos(data);
+  } catch (error) {
+    setError((error as Error).message || 'Failed to fetch todos');
+  } finally {
+    setLoading(false);
+  }
+};
 /**
  * TodoList component fetches todos from the API and displays them in a list.
  * It also provides filter buttons to filter the todos based on their completion status.
@@ -47,6 +58,26 @@ export const fetchTodos = async ({
 // remove the following line when you use onSelectTodo in the component
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 export const TodoList: React.FC<TodoListProps> = ({ onSelectTodo }) => {
+  const [todos, setTodos] = useState<Todo[]>([]);
+  const [filteredTodos, setFilteredTodos] = useState<Todo[]>([]);
+  const [loading, setLoading] = useState<boolean>(false);
+  const [error, setError] = useState<string | null>(null);
+  const [filter, setFilter] = useState<'all' | 'open' | 'completed'>('all');
+
+  useEffect(() => {
+    fetchTodos({ setTodos, setFilteredTodos, setLoading, setError });
+  }, []);
+
+  useEffect(() => {
+    if (filter === 'all') {
+      setFilteredTodos(todos);
+    } else if (filter === 'completed') {
+      setFilteredTodos(todos.filter((todo) => todo.completed));
+    } else {
+      setFilteredTodos(todos.filter((todo) => !todo.completed));
+    }
+  }, [filter, todos]);
+
   return (
     <div className="todo-list">
       <h2>Todo List</h2>
@@ -59,14 +90,45 @@ export const TodoList: React.FC<TodoListProps> = ({ onSelectTodo }) => {
         <code> .todo-button.completed</code> CSS style in App.css
       </p>
       <div className="filter-buttons">
-        <button data-testid="filter-all">All</button>
-        <button data-testid="filter-open">Open</button>
-        <button data-testid="filter-completed">Completed</button>
+        <button
+          data-testid="filter-all"
+          className={filter === 'all' ? 'active' : ''}
+          onClick={() => setFilter('all')}
+        >
+          All
+        </button>
+        <button
+          data-testid="filter-open"
+          className={filter === 'open' ? 'active' : ''}
+          onClick={() => setFilter('open')}
+        >
+          Open
+        </button>
+        <button
+          data-testid="filter-completed"
+          className={filter === 'completed' ? 'active' : ''}
+          onClick={() => setFilter('completed')}
+        >
+          Completed
+        </button>
       </div>
-      <p>
-        Show a list of todo&apos;s here. Make it so if you click a todo it calls the event
-        handler onSelectTodo with the todo id to show the individual todo
-      </p>
+
+      {loading && <p>Loading todos...</p>}
+      {error && <p style={{ color: 'red' }}>Error loading todos: {error}</p>}
+
+      <ul>
+        {filteredTodos.map((todo) => (
+          <li key={todo.id}>
+            <button
+              className={`todo-button ${todo.completed ? 'completed' : ''}`}
+              onClick={() => onSelectTodo(todo.id)}
+            >
+              <span>{todo.title}</span>
+              <span>{todo.completed ? '✅' : '❌'}</span>
+            </button>
+          </li>
+        ))}
+      </ul>
     </div>
   );
 };
